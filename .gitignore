@@ -4,12 +4,12 @@
 */DerivedDataCache
 */Intermediate
 */Saved
-ArchitectureExplorer/Content/StarterContent/Textures
-ArchitectureExplorer/Content/StarterContent/HDRI
-ArchitectureExplorer/Content/ArcVizAssets
+FirstVR/Content/StarterContent/Textures
+FirstVR/Content/StarterContent/HDRI
+FirstVR/Content/ArcVizAssets
 *_BuildData
 
-ArchitectureExplorer/.vs/ArchitectureExplorer/v15/.suo
-ArchitectureExplorer/.vs/ArchitectureExplorer/v15/Browse.VC.db
-ArchitectureExplorer/.vs/config/applicationhost.config
-ArchitectureExplorer/.vs/
+FirstVR/.vs/ArchitectureExplorer/v15/.suo
+FirstVR/.vs/ArchitectureExplorer/v15/Browse.VC.db
+FirstVR/.vs/config/applicationhost.config
+FirstVR/.vs/
