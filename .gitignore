@@ -1,0 +1,15 @@
+#Unreal Generate Files
+*/Build
+*/Binaries
+*/DerivedDataCache
+*/Intermediate
+*/Saved
+ArchitectureExplorer/Content/StarterContent/Textures
+ArchitectureExplorer/Content/StarterContent/HDRI
+
+
+
+ArchitectureExplorer/.vs/ArchitectureExplorer/v15/.suo
+ArchitectureExplorer/.vs/ArchitectureExplorer/v15/Browse.VC.db
+ArchitectureExplorer/.vs/config/applicationhost.config
+ArchitectureExplorer/.vs/
