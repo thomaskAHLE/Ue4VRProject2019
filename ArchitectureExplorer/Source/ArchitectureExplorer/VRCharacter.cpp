@@ -1,7 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "VRCharacter.h"
-
+#include "HeadMountedDisplayFunctionLibrary.h"
+#include "HeadMountedDisplay.h"
 
 // Sets default values
 AVRCharacter::AVRCharacter()
@@ -10,7 +11,11 @@ AVRCharacter::AVRCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 
 	m_camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
-	m_camera->SetupAttachment(GetRootComponent());
+	m_VRRoot = CreateDefaultSubobject<USceneComponent>(TEXT("VRRoot"));
+	m_VRRoot->SetupAttachment(GetRootComponent());
+	m_camera->SetupAttachment(m_VRRoot);
+
+	m_VRRoot->RelativeLocation.Set(0.0f, 0.0f, -90.15f);
 
 }
 
@@ -18,13 +23,18 @@ AVRCharacter::AVRCharacter()
 void AVRCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	
+	UHeadMountedDisplayFunctionLibrary::SetTrackingOrigin(EHMDTrackingOrigin::Floor);
+
 }
 
 // Called every frame
 void AVRCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	FVector cameraOffset = m_camera->GetComponentLocation() - GetActorLocation();
+	cameraOffset = FVector::VectorPlaneProject(cameraOffset, m_camera->GetUpVector());
+	AddActorWorldOffset(cameraOffset);
+	m_VRRoot->AddWorldOffset(-cameraOffset);
 
 }
 

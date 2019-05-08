@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "Camera/CameraComponent.h"
 #include "Components/InputComponent.h"
+#include "Components/SceneCaptureComponent.h"
 #include "VRCharacter.generated.h"
 
 
@@ -31,7 +32,9 @@ public:
 
 private:
 	UCameraComponent*  m_camera;
-
+	USceneComponent* m_VRRoot;
+	FVector m_previousPos;
 	void MoveForward(float throttle);
 	void MoveRight(float throttle);
+
 };
