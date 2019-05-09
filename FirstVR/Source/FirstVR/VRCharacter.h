@@ -5,6 +5,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/InputComponent.h"
 #include "Components/SceneCaptureComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "VRCharacter.generated.h"
 
 
@@ -29,9 +30,19 @@ public:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 private:
+	UPROPERTY(VisibleAnywhere)
 	UCameraComponent*  m_camera;
+
+	UPROPERTY(VisibleAnywhere)
 	USceneComponent* m_VRRoot;
-	FVector m_previousPos;
+
+	UPROPERTY(VisibleAnywhere)
+	UStaticMeshComponent* m_destinationMarker;
+
+	UPROPERTY(EditAnywhere)
+	float m_maxTeleportDistance = 1000.0f;
+
+	void UpdateDestinationMarker();
 	void MoveForward(float throttle);
 	void MoveRight(float throttle);
 

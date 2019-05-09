@@ -1,6 +1,7 @@
 #include "VRCharacter.h"
 #include "HeadMountedDisplayFunctionLibrary.h"
 #include "HeadMountedDisplay.h"
+#include "Engine/World.h"
 
 // Sets default values
 AVRCharacter::AVRCharacter()
@@ -10,8 +11,12 @@ AVRCharacter::AVRCharacter()
 
 	m_camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	m_VRRoot = CreateDefaultSubobject<USceneComponent>(TEXT("VRRoot"));
+	m_destinationMarker = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DestinationMarker"));
 	m_VRRoot->SetupAttachment(GetRootComponent());
 	m_camera->SetupAttachment(m_VRRoot);
+	m_destinationMarker->SetupAttachment(m_VRRoot);
+
+
 
 	m_VRRoot->RelativeLocation.Set(0.0f, 0.0f, -90.15f);
 
@@ -33,7 +38,19 @@ void AVRCharacter::Tick(float DeltaTime)
 	cameraOffset = FVector::VectorPlaneProject(cameraOffset, m_camera->GetUpVector());
 	AddActorWorldOffset(cameraOffset);
 	m_VRRoot->AddWorldOffset(-cameraOffset);
+	UpdateDestinationMarker();
+}
 
+void AVRCharacter::UpdateDestinationMarker()
+{
+	FVector start = m_camera->GetComponentLocation();
+	FVector end = start + m_camera->GetForwardVector() * m_maxTeleportDistance;
+	FHitResult hitResult;
+	bool isHit = GetWorld()->LineTraceSingleByChannel(hitResult, start, end, ECC_Visibility);
+	if (isHit)
+	{
+		m_destinationMarker->SetWorldLocation(hitResult.Location);
+	}
 }
 
 // Called to bind functionality to input
