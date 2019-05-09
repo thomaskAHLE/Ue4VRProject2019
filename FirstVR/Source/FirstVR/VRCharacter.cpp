@@ -49,7 +49,11 @@ void AVRCharacter::UpdateDestinationMarker()
 	bool isHit = GetWorld()->LineTraceSingleByChannel(hitResult, start, end, ECC_Visibility);
 	if (isHit)
 	{
+		m_destinationMarker->SetVisibility(true);
 		m_destinationMarker->SetWorldLocation(hitResult.Location);
+	}
+	else {
+		m_destinationMarker->SetVisibility(false);
 	}
 }
 
