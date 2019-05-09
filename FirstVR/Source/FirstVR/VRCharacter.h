@@ -6,6 +6,9 @@
 #include "Components/InputComponent.h"
 #include "Components/SceneCaptureComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/PostProcessComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Curves/CurveFloat.h"
 #include "VRCharacter.generated.h"
 
 
@@ -30,10 +33,10 @@ public:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 private:
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY()
 	UCameraComponent*  m_camera;
 
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY()
 	USceneComponent* m_VRRoot;
 
 	UPROPERTY(VisibleAnywhere)
@@ -43,10 +46,30 @@ private:
 	float m_maxTeleportDistance = 1000.0f;
 
 	UPROPERTY(EditAnywhere)
-	float m_fadeTime = 1.5f;
+	float m_fadeTime = 1.0f;
+
+	UPROPERTY(EditAnywhere)
+	FVector m_teleportProjectionExtent = FVector(100.0f, 100.0f, 100.0f);
+
+	UPROPERTY()
+	UPostProcessComponent* m_postProcessingComponent;
+
+	UPROPERTY(EditAnywhere)
+	UMaterialInterface* m_blinkerMaterialBase;
+
+	UPROPERTY()
+	UMaterialInstanceDynamic* m_blinkerMaterialInstance;
+
+
+	UPROPERTY(EditAnywhere)
+	UCurveFloat* m_radiusVSvelocityCurve;
+
 
 
 	void UpdateDestinationMarker();
+	void UpdateBlinkers();
+	bool FindTeleportDestination(FVector &OutLocation);
+	void StartFade(float fromAlpha, float toAplpha);
 	void MoveForward(float throttle);
 	void MoveRight(float throttle);
 	void BeginTeleport();

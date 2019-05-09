@@ -3,6 +3,9 @@
 #include "HeadMountedDisplay.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "Components/CapsuleComponent.h"
+#include "AI/Navigation/NavigationSystem.h"
+
 
 // Sets default values
 AVRCharacter::AVRCharacter()
@@ -13,10 +16,12 @@ AVRCharacter::AVRCharacter()
 	m_camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	m_VRRoot = CreateDefaultSubobject<USceneComponent>(TEXT("VRRoot"));
 	m_destinationMarker = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DestinationMarker"));
+	m_postProcessingComponent = CreateDefaultSubobject<UPostProcessComponent>(TEXT("PostProcessingComponent"));
+
 	m_VRRoot->SetupAttachment(GetRootComponent());
 	m_camera->SetupAttachment(m_VRRoot);
 	m_destinationMarker->SetupAttachment(m_VRRoot);
-
+	m_postProcessingComponent->SetupAttachment(m_VRRoot);
 	
 	m_VRRoot->RelativeLocation.Set(0.0f, 0.0f, -90.15f);
 
@@ -27,7 +32,12 @@ void AVRCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	UHeadMountedDisplayFunctionLibrary::SetTrackingOrigin(EHMDTrackingOrigin::Floor);
+	if (m_blinkerMaterialBase != nullptr)
+	{
+		m_blinkerMaterialInstance = UMaterialInstanceDynamic::Create(m_blinkerMaterialBase, this);
+		m_postProcessingComponent->AddOrUpdateBlendable(m_blinkerMaterialInstance);
 
+	}
 }
 
 // Called every frame
@@ -39,24 +49,46 @@ void AVRCharacter::Tick(float DeltaTime)
 	AddActorWorldOffset(cameraOffset);
 	m_VRRoot->AddWorldOffset(-cameraOffset);
 	UpdateDestinationMarker();
+	UpdateBlinkers();
 }
 
 void AVRCharacter::UpdateDestinationMarker()
 {
-	FVector start = m_camera->GetComponentLocation();
-	FVector end = start + m_camera->GetForwardVector() * m_maxTeleportDistance;
-	FHitResult hitResult;
-	bool isHit = GetWorld()->LineTraceSingleByChannel(hitResult, start, end, ECC_Visibility);
-	if (isHit)
+	FVector destination;
+	
+	if (FindTeleportDestination(destination))
 	{
 		m_destinationMarker->SetVisibility(true);
-		m_destinationMarker->SetWorldLocation(hitResult.Location);
+		m_destinationMarker->SetWorldLocation(destination);
 	}
-	else {
+	else
+	{
 		m_destinationMarker->SetVisibility(false);
 	}
 }
-
+void AVRCharacter::UpdateBlinkers()
+{
+	if (m_radiusVSvelocityCurve)
+	{
+		float speed = GetVelocity().Size();
+		float radius = m_radiusVSvelocityCurve->GetFloatValue(speed);
+		m_blinkerMaterialInstance->SetScalarParameterValue(TEXT("radius"), radius);
+	}
+}
+bool AVRCharacter :: FindTeleportDestination(FVector & OutLocation)
+{
+	FVector start = m_camera->GetComponentLocation();
+	FVector end = start + m_camera->GetForwardVector() * m_maxTeleportDistance;
+	FHitResult hitResult;
+	FNavLocation navLocation;
+	bool canTeleport = (GetWorld()->LineTraceSingleByChannel(hitResult, start, end, ECC_Visibility)) &&
+		(GetWorld()->GetNavigationSystem()->ProjectPointToNavigation(hitResult.Location, navLocation, m_teleportProjectionExtent));
+	if (canTeleport)
+	{
+		OutLocation = navLocation.Location;
+	}
+	return canTeleport;
+}
 // Called to bind functionality to input
 void AVRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -76,22 +108,26 @@ void AVRCharacter::MoveRight(float throttle)
 	AddMovementInput(throttle* m_camera->GetRightVector());
 }
 
+void AVRCharacter::StartFade(float fromAlpha, float toAlpha)
+{
+	APlayerController* pc = Cast<APlayerController>(GetController());
+	if (pc)
+	{
+		pc->PlayerCameraManager->StartCameraFade(fromAlpha, toAlpha, m_fadeTime, FLinearColor::Black, true);
+	}
+}
+
 void AVRCharacter::BeginTeleport() 
 {
 	APlayerController* pc = Cast<APlayerController>(GetController());
-	if (pc)
-	{
-		pc->PlayerCameraManager->StartCameraFade(0.0f, 1.0f, m_fadeTime, FLinearColor::Black, true);
-		FTimerHandle handle;
-		GetWorldTimerManager().SetTimer(handle, this, &AVRCharacter::EndTeleport, m_fadeTime);
-	}
+	StartFade(0.0f, 1.0f);
+	FTimerHandle handle;
+	GetWorldTimerManager().SetTimer(handle, this, &AVRCharacter::EndTeleport, m_fadeTime);
+	
 }
-void AVRCharacter::EndTeleport() 
+void AVRCharacter::EndTeleport()
 {
-	SetActorLocation(m_destinationMarker->GetComponentLocation());
-	APlayerController* pc = Cast<APlayerController>(GetController());
-	if (pc)
-	{
-		pc->PlayerCameraManager->StartCameraFade(1.0f, 0.0f, m_fadeTime, FLinearColor::Black, true);
-	}
+
+	SetActorLocation(m_destinationMarker->GetComponentLocation() + FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight()));
+	StartFade(1.0f, 0.0f);
 }
