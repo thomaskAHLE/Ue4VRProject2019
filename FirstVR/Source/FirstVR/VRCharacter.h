@@ -42,9 +42,15 @@ private:
 	UPROPERTY(EditAnywhere)
 	float m_maxTeleportDistance = 1000.0f;
 
+	UPROPERTY(EditAnywhere)
+	float m_fadeTime = 1.5f;
+
+
 	void UpdateDestinationMarker();
 	void MoveForward(float throttle);
 	void MoveRight(float throttle);
+	void BeginTeleport();
+	void EndTeleport();
 
 };
 

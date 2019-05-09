@@ -2,6 +2,7 @@
 #include "HeadMountedDisplayFunctionLibrary.h"
 #include "HeadMountedDisplay.h"
 #include "Engine/World.h"
+#include "TimerManager.h"
 
 // Sets default values
 AVRCharacter::AVRCharacter()
@@ -16,8 +17,7 @@ AVRCharacter::AVRCharacter()
 	m_camera->SetupAttachment(m_VRRoot);
 	m_destinationMarker->SetupAttachment(m_VRRoot);
 
-
-
+	
 	m_VRRoot->RelativeLocation.Set(0.0f, 0.0f, -90.15f);
 
 }
@@ -63,6 +63,7 @@ void AVRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 	PlayerInputComponent->BindAxis(TEXT("Forward"), this, &AVRCharacter::MoveForward);
 	PlayerInputComponent->BindAxis(TEXT("Right"), this, &AVRCharacter::MoveRight);
+	PlayerInputComponent->BindAction(TEXT("Teleport"),IE_Released,this, &AVRCharacter::BeginTeleport);
 }
 
 void AVRCharacter::MoveForward(float throttle)
@@ -73,4 +74,24 @@ void AVRCharacter::MoveForward(float throttle)
 void AVRCharacter::MoveRight(float throttle)
 {
 	AddMovementInput(throttle* m_camera->GetRightVector());
+}
+
+void AVRCharacter::BeginTeleport() 
+{
+	APlayerController* pc = Cast<APlayerController>(GetController());
+	if (pc)
+	{
+		pc->PlayerCameraManager->StartCameraFade(0.0f, 1.0f, m_fadeTime, FLinearColor::Black, true);
+		FTimerHandle handle;
+		GetWorldTimerManager().SetTimer(handle, this, &AVRCharacter::EndTeleport, m_fadeTime);
+	}
+}
+void AVRCharacter::EndTeleport() 
+{
+	SetActorLocation(m_destinationMarker->GetComponentLocation());
+	APlayerController* pc = Cast<APlayerController>(GetController());
+	if (pc)
+	{
+		pc->PlayerCameraManager->StartCameraFade(1.0f, 0.0f, m_fadeTime, FLinearColor::Black, true);
+	}
 }
