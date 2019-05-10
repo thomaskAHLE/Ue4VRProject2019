@@ -9,8 +9,11 @@
 #include "Components/PostProcessComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "MotionControllerComponent.h"
+#include "Components/SplineComponent.h"
+#include "Components/SplineMeshComponent.h"
 #include "Curves/CurveFloat.h"
 #include "VRCharacter.generated.h"
+
 
 
 UCLASS()
@@ -59,7 +62,18 @@ private:
 	float m_teleportSimulationTime = 1.0f;
 
 	UPROPERTY(EditAnywhere)
+	USplineComponent* m_teleportationPath;
+	
+	bool m_canTeleport = false;
+
+	FVector m_teleportLocation;
+	
+
+
+	UPROPERTY(EditAnywhere)
 	float m_fadeTime = 1.0f;
+
+
 
 	UPROPERTY(EditAnywhere)
 	FVector m_teleportProjectionExtent = FVector(100.0f, 100.0f, 100.0f);
@@ -77,13 +91,21 @@ private:
 	UPROPERTY(EditAnywhere)
 	UCurveFloat* m_radiusVSvelocityCurve;
 
-	bool m_canTeleport = false;
 
-	FVector m_teleportLocation;
+
+	UPROPERTY(EditDefaultsOnly)
+	UStaticMesh* m_teleportArchMesh;
 	
+	UPROPERTY(EditDefaultsOnly)
+	UMaterialInterface* m_teleportArchMaterial;
+
+	UPROPERTY()
+	TArray<USplineMeshComponent*> m_pathStaticMeshes;
 
 	void UpdateDestinationMarker();
 	void UpdateBlinkers();
+	void HideTeleportPath();
+	void DrawTeleportPath(const TArray<FVector> & pathPoints);
 	FVector2D GetBlinkerCenter();
 	bool FindTeleportDestination(FVector &OutLocation);
 	void StartFade(float fromAlpha, float toAplpha);
