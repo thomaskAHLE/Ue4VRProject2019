@@ -73,7 +73,40 @@ void AVRCharacter::UpdateBlinkers()
 		float speed = GetVelocity().Size();
 		float radius = m_radiusVSvelocityCurve->GetFloatValue(speed);
 		m_blinkerMaterialInstance->SetScalarParameterValue(TEXT("radius"), radius);
+		FVector2D center = GetBlinkerCenter();
+		m_blinkerMaterialInstance->SetVectorParameterValue(TEXT("center"), FLinearColor(center.X, center.Y, 0.0f));
 	}
+	
+}
+
+FVector2D AVRCharacter::GetBlinkerCenter()
+{
+	FVector movementDirection = GetVelocity().GetSafeNormal();
+	if (!movementDirection.IsNearlyZero())
+	{
+		APlayerController* pc = Cast<APlayerController>(GetController());
+		if (pc)
+		{
+			FVector worldStationaryLocation;
+			if (FVector::DotProduct(m_camera->GetForwardVector(), movementDirection)> 0.0f)
+			{
+					worldStationaryLocation = m_camera->GetComponentLocation() + movementDirection * 1000;
+			}
+			else 
+			{
+				worldStationaryLocation = m_camera->GetComponentLocation() - movementDirection * 1000;
+			}
+		    FVector2D screenLocation;
+			pc->ProjectWorldLocationToScreen(worldStationaryLocation, screenLocation);
+			int32 sizeX;
+			int32 sizeY;
+			pc->GetViewportSize(sizeX, sizeY);
+			//normalize into UV coordinates
+			return FVector2D(screenLocation.X / sizeX, screenLocation.Y / sizeY);
+				
+		}
+	}
+	return FVector2D(0.5f, 0.5f);
 }
 bool AVRCharacter :: FindTeleportDestination(FVector & OutLocation)
 {

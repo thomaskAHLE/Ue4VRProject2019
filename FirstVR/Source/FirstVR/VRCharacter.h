@@ -68,6 +68,7 @@ private:
 
 	void UpdateDestinationMarker();
 	void UpdateBlinkers();
+	FVector2D GetBlinkerCenter();
 	bool FindTeleportDestination(FVector &OutLocation);
 	void StartFade(float fromAlpha, float toAplpha);
 	void MoveForward(float throttle);
