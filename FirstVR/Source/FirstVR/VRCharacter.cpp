@@ -1,10 +1,12 @@
 #include "VRCharacter.h"
 #include "HeadMountedDisplayFunctionLibrary.h"
 #include "HeadMountedDisplay.h"
+
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "Components/CapsuleComponent.h"
 #include "AI/Navigation/NavigationSystem.h"
+#include "Kismet/GameplayStatics.h"
 
 
 // Sets default values
@@ -18,11 +20,20 @@ AVRCharacter::AVRCharacter()
 	m_destinationMarker = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DestinationMarker"));
 	m_postProcessingComponent = CreateDefaultSubobject<UPostProcessComponent>(TEXT("PostProcessingComponent"));
 
+	m_leftMotionController = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("LeftMotionController"));
+	m_rightMotionController = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("RightMotionController"));
+
 	m_VRRoot->SetupAttachment(GetRootComponent());
 	m_camera->SetupAttachment(m_VRRoot);
 	m_destinationMarker->SetupAttachment(m_VRRoot);
 	m_postProcessingComponent->SetupAttachment(m_VRRoot);
-	
+	m_leftMotionController->SetupAttachment(m_VRRoot);
+	m_leftMotionController->SetTrackingSource(EControllerHand::Left);
+	m_leftMotionController->SetShowDeviceModel(true);
+	m_rightMotionController->SetupAttachment(m_VRRoot);
+	m_rightMotionController->SetTrackingSource(EControllerHand::Right);
+	m_rightMotionController->SetShowDeviceModel(true);
+
 	m_VRRoot->RelativeLocation.Set(0.0f, 0.0f, -90.15f);
 
 }
@@ -68,8 +79,10 @@ void AVRCharacter::UpdateDestinationMarker()
 }
 void AVRCharacter::UpdateBlinkers()
 {
+	//update radius of blinker based on character velocity, calculated by unreal curve
 	if (m_radiusVSvelocityCurve)
 	{
+		
 		float speed = GetVelocity().Size();
 		float radius = m_radiusVSvelocityCurve->GetFloatValue(speed);
 		m_blinkerMaterialInstance->SetScalarParameterValue(TEXT("radius"), radius);
@@ -88,6 +101,7 @@ FVector2D AVRCharacter::GetBlinkerCenter()
 		if (pc)
 		{
 			FVector worldStationaryLocation;
+			//if moving forwards add movement direction, if moving backwards subtract movement direction 
 			if (FVector::DotProduct(m_camera->GetForwardVector(), movementDirection)> 0.0f)
 			{
 					worldStationaryLocation = m_camera->GetComponentLocation() + movementDirection * 1000;
@@ -110,17 +124,29 @@ FVector2D AVRCharacter::GetBlinkerCenter()
 }
 bool AVRCharacter :: FindTeleportDestination(FVector & OutLocation)
 {
-	FVector start = m_camera->GetComponentLocation();
-	FVector end = start + m_camera->GetForwardVector() * m_maxTeleportDistance;
-	FHitResult hitResult;
-	FNavLocation navLocation;
-	bool canTeleport = (GetWorld()->LineTraceSingleByChannel(hitResult, start, end, ECC_Visibility)) &&
-		(GetWorld()->GetNavigationSystem()->ProjectPointToNavigation(hitResult.Location, navLocation, m_teleportProjectionExtent));
-	if (canTeleport)
+	m_canTeleport = false;
+	FVector start = m_rightMotionController->GetComponentLocation();
+	FVector look = m_rightMotionController->GetForwardVector();
+
+	FPredictProjectilePathParams params(
+		m_teleportProjectileRadius, start, look* m_teleportProjectileSpeed,
+		m_teleportSimulationTime, ECollisionChannel::ECC_Camera, this
+		);
+	params.DrawDebugType = EDrawDebugTrace::ForOneFrame;
+	params.bTraceComplex = true;
+	FPredictProjectilePathResult result;
+	m_canTeleport = UGameplayStatics::PredictProjectilePath(this, params, result);
+	if (m_canTeleport) 
 	{
-		OutLocation = navLocation.Location;
+		//use navMesh to constrain teleportation to only the floor area 
+		FNavLocation navLocation;
+		m_canTeleport = (GetWorld()->GetNavigationSystem()->ProjectPointToNavigation(result.HitResult.Location, navLocation, m_teleportProjectionExtent));
+		if (m_canTeleport)
+		{
+			OutLocation = navLocation.Location;
+		}
 	}
-	return canTeleport;
+	return m_canTeleport;
 }
 // Called to bind functionality to input
 void AVRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -152,15 +178,18 @@ void AVRCharacter::StartFade(float fromAlpha, float toAlpha)
 
 void AVRCharacter::BeginTeleport() 
 {
-	APlayerController* pc = Cast<APlayerController>(GetController());
-	StartFade(0.0f, 1.0f);
-	FTimerHandle handle;
-	GetWorldTimerManager().SetTimer(handle, this, &AVRCharacter::EndTeleport, m_fadeTime);
-	
+	if (m_canTeleport)
+	{
+		m_teleportLocation = m_destinationMarker->GetComponentLocation() + FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+		APlayerController* pc = Cast<APlayerController>(GetController());
+		StartFade(0.0f, 1.0f);
+		FTimerHandle handle;
+		GetWorldTimerManager().SetTimer(handle, this, &AVRCharacter::EndTeleport, m_fadeTime);
+	}
 }
 void AVRCharacter::EndTeleport()
 {
 
-	SetActorLocation(m_destinationMarker->GetComponentLocation() + FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight()));
+	SetActorLocation(m_teleportLocation);
 	StartFade(1.0f, 0.0f);
 }

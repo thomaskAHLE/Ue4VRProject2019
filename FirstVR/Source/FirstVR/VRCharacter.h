@@ -8,6 +8,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/PostProcessComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "MotionControllerComponent.h"
 #include "Curves/CurveFloat.h"
 #include "VRCharacter.generated.h"
 
@@ -36,6 +37,12 @@ private:
 	UPROPERTY()
 	UCameraComponent*  m_camera;
 
+	UPROPERTY(EditAnywhere)
+	UMotionControllerComponent* m_leftMotionController;
+
+	UPROPERTY(EditAnywhere)
+	UMotionControllerComponent* m_rightMotionController;
+
 	UPROPERTY()
 	USceneComponent* m_VRRoot;
 
@@ -43,7 +50,13 @@ private:
 	UStaticMeshComponent* m_destinationMarker;
 
 	UPROPERTY(EditAnywhere)
-	float m_maxTeleportDistance = 1000.0f;
+	float m_teleportProjectileRadius = 10.0f;
+
+	UPROPERTY(EditAnywhere)
+	float m_teleportProjectileSpeed = 800.0f;
+
+	UPROPERTY(EditAnywhere)
+	float m_teleportSimulationTime = 1.0f;
 
 	UPROPERTY(EditAnywhere)
 	float m_fadeTime = 1.0f;
@@ -64,7 +77,10 @@ private:
 	UPROPERTY(EditAnywhere)
 	UCurveFloat* m_radiusVSvelocityCurve;
 
+	bool m_canTeleport = false;
 
+	FVector m_teleportLocation;
+	
 
 	void UpdateDestinationMarker();
 	void UpdateBlinkers();
