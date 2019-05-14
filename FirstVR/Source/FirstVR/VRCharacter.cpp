@@ -24,7 +24,7 @@ AVRCharacter::AVRCharacter()
 	m_rightMotionController = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("RightMotionController"));
 
 	m_teleportationPath = CreateDefaultSubobject<USplineComponent>(TEXT("TeleportationPath"));
-	
+	m_teleportDirection = CreateDefaultSubobject<UArrowComponent>(TEXT("directionalArrow"));
 
 
 
@@ -39,9 +39,13 @@ AVRCharacter::AVRCharacter()
 	m_rightMotionController->SetTrackingSource(EControllerHand::Right);
 	m_rightMotionController->SetShowDeviceModel(true);
 	m_teleportationPath->SetupAttachment(m_rightMotionController);
+	m_teleportDirection->SetupAttachment(m_destinationMarker);
 
 	m_VRRoot->RelativeLocation.Set(0.0f, 0.0f, -90.15f);
-
+	
+	m_teleportDirection->SetWorldLocation(m_teleportDirection->GetComponentLocation() + GetCapsuleComponent()->GetScaledCapsuleHalfHeight()* GetActorUpVector());
+	m_teleportDirection->bHiddenInGame = false;
+	m_teleportDirection->ArrowSize = 2;
 }
 
 // Called when the game starts or when spawned
@@ -77,11 +81,19 @@ void AVRCharacter::UpdateDestinationMarker()
 	if (FindTeleportDestination(destination))
 	{
 		m_destinationMarker->SetVisibility(true);
+		m_teleportDirection->SetVisibility(true);
+		//UE_LOG(LogTemp, Warning, TEXT("rotate %f, rotateX %f, rotateY %f"), acosf(m_rotateDirX / sqrt(m_rotateDirX*m_rotateDirX + m_rotateDirY * m_rotateDirY)), m_rotateDirX, m_rotateDirY);
+		float dirHypotenuse = sqrtf(m_rotateDirX*m_rotateDirX + m_rotateDirY * m_rotateDirY);
+		if (abs(dirHypotenuse) > .000002)
+		{
+			m_teleportDirection->AddLocalRotation(FRotator(0.0f, acosf(m_rotateDirX / dirHypotenuse), 0.0f));
+		}
 		m_destinationMarker->SetWorldLocation(destination);
 	}
 	else
 	{
 		m_destinationMarker->SetVisibility(false);
+		m_teleportDirection->SetVisibility(false);
 	}
 }
 void AVRCharacter::UpdateBlinkers()
@@ -205,6 +217,8 @@ void AVRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	PlayerInputComponent->BindAxis(TEXT("Forward"), this, &AVRCharacter::MoveForward);
 	PlayerInputComponent->BindAxis(TEXT("Right"), this, &AVRCharacter::MoveRight);
 	PlayerInputComponent->BindAction(TEXT("Teleport"),IE_Released,this, &AVRCharacter::BeginTeleport);
+	PlayerInputComponent->BindAxis(TEXT("RotateTeleportDirX"),this, &AVRCharacter::RotateTeleportDirectionX);
+	PlayerInputComponent->BindAxis(TEXT("RotateTeleportDirY"), this, &AVRCharacter::RotateTeleportDirectionY);
 }
 
 void AVRCharacter::MoveForward(float throttle)
@@ -215,6 +229,17 @@ void AVRCharacter::MoveForward(float throttle)
 void AVRCharacter::MoveRight(float throttle)
 {
 	AddMovementInput(throttle* m_camera->GetRightVector());
+}
+
+
+void AVRCharacter::RotateTeleportDirectionX(float dirX)
+{
+	m_rotateDirX = dirX;
+}
+
+void AVRCharacter::RotateTeleportDirectionY(float dirY)
+{
+	m_rotateDirY = dirY;
 }
 
 void AVRCharacter::StartFade(float fromAlpha, float toAlpha)
@@ -233,13 +258,16 @@ void AVRCharacter::BeginTeleport()
 		m_teleportLocation = m_destinationMarker->GetComponentLocation() + GetCapsuleComponent()->GetScaledCapsuleHalfHeight()* GetActorUpVector();
 		APlayerController* pc = Cast<APlayerController>(GetController());
 		StartFade(0.0f, 1.0f);
+		m_teleportDirRotation = FRotator(m_teleportDirection->GetComponentTransform().GetRotation());
 		FTimerHandle handle;
 		GetWorldTimerManager().SetTimer(handle, this, &AVRCharacter::EndTeleport, m_fadeTime);
 	}
 }
 void AVRCharacter::EndTeleport()
 {
-
+	m_VRRoot->SetWorldRotation(m_teleportDirRotation);
 	SetActorLocation(m_teleportLocation);
+	m_teleportDirection->SetWorldRotation(FRotator(0.0f, 90.0f, 0.0f));
 	StartFade(1.0f, 0.0f);
 }
+

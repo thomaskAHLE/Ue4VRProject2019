@@ -7,6 +7,7 @@
 #include "Components/SceneCaptureComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PostProcessComponent.h"
+#include "Components/ArrowComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "MotionControllerComponent.h"
 #include "Components/SplineComponent.h"
@@ -102,6 +103,14 @@ private:
 	UPROPERTY()
 	TArray<USplineMeshComponent*> m_pathStaticMeshes;
 
+	UPROPERTY(EditAnywhere)
+	UArrowComponent* m_teleportDirection;
+
+	
+	float m_rotateDirX = 0.0f;
+	float m_rotateDirY = 1.0f;
+	FRotator m_teleportDirRotation;
+
 	void UpdateDestinationMarker();
 	void UpdateBlinkers();
 	void HideTeleportPath();
@@ -113,6 +122,9 @@ private:
 	void MoveRight(float throttle);
 	void BeginTeleport();
 	void EndTeleport();
+	void RotateTeleportDirectionX(float xDir);
+	void RotateTeleportDirectionY(float yDir);
+
 
 };
 
