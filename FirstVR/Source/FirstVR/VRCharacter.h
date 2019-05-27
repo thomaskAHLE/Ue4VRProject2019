@@ -12,6 +12,7 @@
 #include "MotionControllerComponent.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
+#include "HandController.h"
 #include "Curves/CurveFloat.h"
 #include "VRCharacter.generated.h"
 
@@ -37,15 +38,15 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-private:
+private:   
 	UPROPERTY()
 	UCameraComponent*  m_camera;
 
 	UPROPERTY(EditAnywhere)
-	UMotionControllerComponent* m_leftMotionController;
+	AHandController* m_leftMotionController;
 
 	UPROPERTY(EditAnywhere)
-	UMotionControllerComponent* m_rightMotionController;
+	AHandController* m_rightMotionController;
 
 	UPROPERTY()
 	USceneComponent* m_VRRoot;
@@ -69,12 +70,8 @@ private:
 
 	FVector m_teleportLocation;
 	
-
-
 	UPROPERTY(EditAnywhere)
 	float m_fadeTime = 1.0f;
-
-
 
 	UPROPERTY(EditAnywhere)
 	FVector m_teleportProjectionExtent = FVector(100.0f, 100.0f, 100.0f);
@@ -100,30 +97,53 @@ private:
 	UPROPERTY(EditDefaultsOnly)
 	UMaterialInterface* m_teleportArchMaterial;
 
+	UPROPERTY(EditDefaultsOnly)
+	TSubclassOf<AHandController> HandControllerClass;
+
+
 	UPROPERTY()
 	TArray<USplineMeshComponent*> m_pathStaticMeshes;
 
 	UPROPERTY(EditAnywhere)
 	UArrowComponent* m_teleportDirection;
 
-	
+	//Rotation Functions and variables
 	float m_rotateDirX = 0.0f;
 	float m_rotateDirY = 1.0f;
 	FRotator m_teleportDirRotation;
-
-	void UpdateDestinationMarker();
-	void UpdateBlinkers();
-	void HideTeleportPath();
-	void DrawTeleportPath(const TArray<FVector> & pathPoints);
-	FVector2D GetBlinkerCenter();
-	bool FindTeleportDestination(FVector &OutLocation);
-	void StartFade(float fromAlpha, float toAplpha);
-	void MoveForward(float throttle);
-	void MoveRight(float throttle);
-	void BeginTeleport();
-	void EndTeleport();
 	void RotateTeleportDirectionX(float xDir);
 	void RotateTeleportDirectionY(float yDir);
+
+	//Teleport Functions
+	void UpdateDestinationMarker();
+	void HideTeleportPath();
+	void DrawTeleportPath(const TArray<FVector> & pathPoints);
+	bool FindTeleportDestination(FVector &OutLocation);
+	void BeginTeleport();
+	void StartFade(float fromAlpha, float toAplpha);
+	void EndTeleport();
+	void ShowTeleport();
+
+
+	//Moving with joystick functions
+	void UpdateBlinkers();
+	FVector2D GetBlinkerCenter();
+	void MoveForward(float throttle);
+	void MoveRight(float throttle);
+
+
+	//Climbing functions
+	void GripLeft() { if(!m_teleportStarted) m_leftMotionController->Grip(); }
+	void ReleaseLeft() { if (!m_teleportStarted)  m_leftMotionController->Release(); }
+
+	void GripRight() { if (!m_teleportStarted) m_rightMotionController->Grip(); }
+	void ReleaseRight() { if (!m_teleportStarted) m_rightMotionController->Release(); }
+	bool IsClimbing() const { return m_rightMotionController->GetIsClimbing() || m_leftMotionController->GetIsClimbing(); }
+
+	
+	//state variabels
+	bool m_teleportStarted = false;
+	
 
 
 };

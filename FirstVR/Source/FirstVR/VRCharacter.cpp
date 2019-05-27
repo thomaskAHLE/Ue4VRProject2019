@@ -20,8 +20,7 @@ AVRCharacter::AVRCharacter()
 	m_destinationMarker = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DestinationMarker"));
 	m_postProcessingComponent = CreateDefaultSubobject<UPostProcessComponent>(TEXT("PostProcessingComponent"));
 
-	m_leftMotionController = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("LeftMotionController"));
-	m_rightMotionController = CreateDefaultSubobject<UMotionControllerComponent>(TEXT("RightMotionController"));
+	
 
 	m_teleportationPath = CreateDefaultSubobject<USplineComponent>(TEXT("TeleportationPath"));
 	m_teleportDirection = CreateDefaultSubobject<UArrowComponent>(TEXT("directionalArrow"));
@@ -32,13 +31,7 @@ AVRCharacter::AVRCharacter()
 	m_camera->SetupAttachment(m_VRRoot);
 	m_destinationMarker->SetupAttachment(m_VRRoot);
 	m_postProcessingComponent->SetupAttachment(m_VRRoot);
-	m_leftMotionController->SetupAttachment(m_VRRoot);
-	m_leftMotionController->SetTrackingSource(EControllerHand::Left);
-	m_leftMotionController->SetShowDeviceModel(true);
-	m_rightMotionController->SetupAttachment(m_VRRoot);
-	m_rightMotionController->SetTrackingSource(EControllerHand::Right);
-	m_rightMotionController->SetShowDeviceModel(true);
-	m_teleportationPath->SetupAttachment(m_rightMotionController);
+	m_teleportationPath->SetupAttachment(m_VRRoot);
 	m_teleportDirection->SetupAttachment(m_destinationMarker);
 
 	m_VRRoot->RelativeLocation.Set(0.0f, 0.0f, -90.15f);
@@ -53,12 +46,39 @@ void AVRCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	UHeadMountedDisplayFunctionLibrary::SetTrackingOrigin(EHMDTrackingOrigin::Floor);
+
+	if (HandControllerClass == nullptr)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("hand controller class doesn't exists"));
+	}
 	if (m_blinkerMaterialBase != nullptr)
 	{
 		m_blinkerMaterialInstance = UMaterialInstanceDynamic::Create(m_blinkerMaterialBase, this);
 		m_postProcessingComponent->AddOrUpdateBlendable(m_blinkerMaterialInstance);
 
 	}
+	
+	m_leftMotionController  = GetWorld()->SpawnActor<AHandController>(HandControllerClass);
+	if (m_leftMotionController != nullptr)
+	{
+		
+		m_leftMotionController->AttachToComponent(m_VRRoot, FAttachmentTransformRules::KeepRelativeTransform);
+		m_leftMotionController->setHand(EControllerHand::Left);
+	}
+	m_rightMotionController = GetWorld()->SpawnActor<AHandController>(HandControllerClass);
+	if (m_rightMotionController != nullptr)
+	{
+		m_rightMotionController->AttachToComponent(m_VRRoot, FAttachmentTransformRules::KeepRelativeTransform);
+		m_rightMotionController->setHand(EControllerHand::Right);
+	}
+	if (m_leftMotionController != nullptr && m_rightMotionController != nullptr)
+	{
+		m_leftMotionController->setOtherController(m_rightMotionController);
+	}
+	
+	m_destinationMarker->SetVisibility(false);
+	m_teleportDirection->SetVisibility(false);
+
 }
 
 // Called every frame
@@ -70,8 +90,12 @@ void AVRCharacter::Tick(float DeltaTime)
 	AddActorWorldOffset(cameraOffset);
 	m_VRRoot->AddWorldOffset(-cameraOffset);
 	HideTeleportPath();
-	UpdateDestinationMarker();
+	if (m_teleportStarted)
+	{
+		UpdateDestinationMarker();
+	}
 	UpdateBlinkers();
+	
 }
 
 void AVRCharacter::UpdateDestinationMarker()
@@ -84,7 +108,7 @@ void AVRCharacter::UpdateDestinationMarker()
 		m_teleportDirection->SetVisibility(true);
 		//UE_LOG(LogTemp, Warning, TEXT("rotate %f, rotateX %f, rotateY %f"), acosf(m_rotateDirX / sqrt(m_rotateDirX*m_rotateDirX + m_rotateDirY * m_rotateDirY)), m_rotateDirX, m_rotateDirY);
 		float dirHypotenuse = sqrtf(m_rotateDirX*m_rotateDirX + m_rotateDirY * m_rotateDirY);
-		if (abs(dirHypotenuse) > .000002)
+		if (abs(dirHypotenuse) > .000002f)
 		{
 			m_teleportDirection->AddLocalRotation(FRotator(0.0f, acosf(m_rotateDirX / dirHypotenuse), 0.0f));
 		}
@@ -153,8 +177,8 @@ bool AVRCharacter :: FindTeleportDestination(FVector & OutLocation)
 {
 	m_canTeleport = false;
 	
-	FVector start = m_rightMotionController->GetComponentLocation();
-	FVector look = m_rightMotionController->GetForwardVector();
+	FVector start = m_rightMotionController->GetActorLocation();
+	FVector look = m_rightMotionController->GetActorForwardVector();
 
 	FPredictProjectilePathParams params(
 		m_teleportProjectileRadius, start, look* m_teleportProjectileSpeed,
@@ -214,32 +238,55 @@ void AVRCharacter::DrawTeleportPath(const TArray<FVector>& pathPoints)
 void AVRCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	//movement with thumbstick
 	PlayerInputComponent->BindAxis(TEXT("Forward"), this, &AVRCharacter::MoveForward);
 	PlayerInputComponent->BindAxis(TEXT("Right"), this, &AVRCharacter::MoveRight);
+
+	//teleportation
 	PlayerInputComponent->BindAction(TEXT("Teleport"),IE_Released,this, &AVRCharacter::BeginTeleport);
+	PlayerInputComponent->BindAction(TEXT("Teleport"), IE_Pressed, this, &AVRCharacter::ShowTeleport);
 	PlayerInputComponent->BindAxis(TEXT("RotateTeleportDirX"),this, &AVRCharacter::RotateTeleportDirectionX);
 	PlayerInputComponent->BindAxis(TEXT("RotateTeleportDirY"), this, &AVRCharacter::RotateTeleportDirectionY);
+
+	//climbing
+	PlayerInputComponent->BindAction(TEXT("GripLeft"), IE_Pressed, this, &AVRCharacter::GripLeft);
+	PlayerInputComponent->BindAction(TEXT("GripLeft"), IE_Released, this, &AVRCharacter::ReleaseLeft);
+	PlayerInputComponent->BindAction(TEXT("GripRight"), IE_Pressed, this, &AVRCharacter::GripRight);
+	PlayerInputComponent->BindAction(TEXT("GripRight"), IE_Released, this, &AVRCharacter::ReleaseRight);
 }
 
 void AVRCharacter::MoveForward(float throttle)
 {
-	AddMovementInput(throttle* m_camera->GetForwardVector());
+	if (!IsClimbing())
+	{
+		AddMovementInput(throttle* m_camera->GetForwardVector());
+	}
 }
 
 void AVRCharacter::MoveRight(float throttle)
 {
-	AddMovementInput(throttle* m_camera->GetRightVector());
+	if (!IsClimbing())
+	{
+		AddMovementInput(throttle* m_camera->GetRightVector());
+	}
 }
 
 
 void AVRCharacter::RotateTeleportDirectionX(float dirX)
 {
-	m_rotateDirX = dirX;
+	if (m_teleportStarted)
+	{
+		m_rotateDirX = dirX;
+	}
 }
 
 void AVRCharacter::RotateTeleportDirectionY(float dirY)
 {
-	m_rotateDirY = dirY;
+	if (m_teleportStarted)
+	{
+		m_rotateDirY = dirY;
+	}
 }
 
 void AVRCharacter::StartFade(float fromAlpha, float toAlpha)
@@ -265,9 +312,25 @@ void AVRCharacter::BeginTeleport()
 }
 void AVRCharacter::EndTeleport()
 {
-	m_VRRoot->SetWorldRotation(m_teleportDirRotation);
-	SetActorLocation(m_teleportLocation);
-	m_teleportDirection->SetWorldRotation(FRotator(0.0f, 90.0f, 0.0f));
-	StartFade(1.0f, 0.0f);
+	if (m_canTeleport && m_teleportStarted)
+	{
+		m_VRRoot->SetWorldRotation(m_teleportDirRotation);
+		SetActorLocation(m_teleportLocation);
+		StartFade(1.0f, 0.0f);
+		m_teleportStarted = false;
+		m_destinationMarker->SetVisibility(false);
+		m_teleportDirection->SetVisibility(false);
+	}
 }
 
+void AVRCharacter::ShowTeleport()
+{
+	if (!IsClimbing())
+	{
+		m_teleportStarted = true;
+		FRotator cameraRotator = m_camera->GetComponentRotation();
+		m_teleportDirection->SetWorldRotation(FRotator(0.0f, cameraRotator.Yaw, 0.0f));
+		m_destinationMarker->SetVisibility(true);
+		m_teleportDirection->SetVisibility(true);
+	}
+}
